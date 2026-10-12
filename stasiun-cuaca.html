@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1b3a5c">
+  <title>Stasiun Cuaca</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ============ Tema langit (berubah mengikuti kondisi cuaca) ============ */
+    @property --sky-a { syntax: '<color>'; inherits: true; initial-value: #1b3a5c; }
+    @property --sky-b { syntax: '<color>'; inherits: true; initial-value: #3d6f9e; }
+
+    :root {
+      --sky-a: #1b3a5c;
+      --sky-b: #3d6f9e;
+      --ink: #ffffff;
+      --ink-soft: rgba(255, 255, 255, 0.82);
+      --glass: rgba(8, 20, 38, 0.38);
+      --glass-line: rgba(255, 255, 255, 0.18);
+      --accent: #ffd36b;
+      --danger-bg: rgba(120, 20, 30, 0.55);
+      --radius: 22px;
+      --font-display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --font-body: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      transition: --sky-a 1s ease, --sky-b 1s ease;
+    }
+    body[data-theme="clear-day"]   { --sky-a: #1d5fa3; --sky-b: #5aa7de; }
+    body[data-theme="clear-night"] { --sky-a: #0b1b3a; --sky-b: #2a3f7a; }
+    body[data-theme="clouds"]      { --sky-a: #44586e; --sky-b: #6f869e; }
+    body[data-theme="rain"]        { --sky-a: #1b2a3a; --sky-b: #4a6178; }
+    body[data-theme="thunder"]     { --sky-a: #181430; --sky-b: #4a3f6b; }
+    body[data-theme="snow"]        { --sky-a: #46688a; --sky-b: #8fb0cc; }
+    body[data-theme="mist"]        { --sky-a: #46535c; --sky-b: #84939c; }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      font-family: var(--font-body);
+      font-size: 1rem;
+      line-height: 1.5;
+      color: var(--ink);
+      background: linear-gradient(165deg, var(--sky-a), var(--sky-b)) fixed;
+    }
+    h1, h2, h3, p { margin: 0; }
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    [hidden] { display: none !important; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+    .app { max-width: 920px; margin: 0 auto; padding: 20px 16px 40px; }
+
+    .glass {
+      background: var(--glass);
+      border: 1px solid var(--glass-line);
+      border-radius: var(--radius);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+
+    /* ============ Header & pencarian ============ */
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .brand { font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; letter-spacing: -0.01em; }
+
+    .unit { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-line); }
+    .unit button {
+      border: 0; background: transparent; padding: 6px 16px; border-radius: 999px;
+      font-weight: 600; min-height: 36px; transition: background .2s, color .2s;
+    }
+    .unit button[aria-pressed="true"] { background: #fff; color: #10253f; }
+
+    .search { display: flex; gap: 8px; }
+    .search input {
+      flex: 1; min-width: 0; min-height: 52px; padding: 0 18px;
+      border-radius: 16px; border: 1px solid var(--glass-line);
+      background: rgba(255, 255, 255, 0.14); color: var(--ink);
+    }
+    .search input::placeholder { color: var(--ink-soft); }
+    .btn {
+      min-height: 52px; padding: 0 20px; border-radius: 16px; font-weight: 600;
+      border: 1px solid var(--glass-line); background: var(--glass); transition: transform .15s, background .2s;
+    }
+    .btn:hover { background: rgba(8, 20, 38, 0.55); }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: #fff; color: #10253f; border-color: #fff; }
+    .btn-primary:hover { background: #eaf3fc; }
+    .btn[disabled] { opacity: 0.6; cursor: progress; }
+    .btn-geo { width: 52px; padding: 0; display: grid; place-items: center; }
+    .btn-geo svg { width: 22px; height: 22px; }
+
+    .history { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+    .history-label { color: var(--ink-soft); font-size: 0.875rem; }
+    .chip {
+      border: 1px solid var(--glass-line); background: var(--glass); border-radius: 999px;
+      padding: 6px 14px; font-size: 0.9rem; min-height: 36px;
+    }
+    .chip:hover { background: rgba(8, 20, 38, 0.55); }
+    .chip-clear { background: transparent; border-style: dashed; color: var(--ink-soft); }
+
+    main > section, .view { margin-top: 20px; }
+
+    /* ============ Cuaca saat ini ============ */
+    .result-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+    @media (min-width: 760px) { .result-grid { grid-template-columns: 1.15fr 1fr; } }
+
+    .now { padding: 24px; }
+    .now-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .city { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.7rem, 6vw, 2.3rem); line-height: 1.1; letter-spacing: -0.02em; }
+    .country { margin-left: 8px; font-weight: 500; font-size: 1rem; color: var(--ink-soft); letter-spacing: 0; }
+    .local-time { margin-top: 4px; color: var(--ink-soft); font-size: 0.95rem; }
+    .now-icon { width: 96px; height: 96px; flex: none; margin: -12px -8px 0 0; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25)); }
+    .temp {
+      margin-top: 8px; font-family: var(--font-display); font-weight: 300;
+      font-size: clamp(5.5rem, 22vw, 9rem); line-height: 0.9; letter-spacing: -0.05em;
+    }
+    .desc { margin-top: 12px; font-size: 1.25rem; font-weight: 500; }
+    .now-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; color: var(--ink-soft); }
+
+    /* ============ Detail ============ */
+    .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content: start; }
+    .tile { padding: 16px; border-radius: 18px; }
+    .tile-label { color: var(--ink-soft); font-size: 0.875rem; }
+    .tile-value { margin-top: 4px; font-family: var(--font-display); font-size: 1.45rem; font-weight: 500; }
+    .meter { margin-top: 10px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
+    .meter > span { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
+
+    /* ============ Prakiraan 5 hari ============ */
+    .forecast { padding: 20px 22px; margin-top: 16px; }
+    .forecast h2 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; margin-bottom: 4px; }
+    .days { list-style: none; margin: 0; padding: 0; }
+    .day {
+      display: grid; grid-template-columns: minmax(78px, 1fr) 48px 42px minmax(60px, 1.6fr) 42px;
+      align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--glass-line);
+    }
+    .day:first-child { border-top: 0; }
+    .day-name { font-weight: 600; text-transform: capitalize; }
+    .day-rain { display: block; font-size: 0.8rem; font-weight: 400; color: var(--ink-soft); }
+    .day img { width: 44px; height: 44px; }
+    .t-min { text-align: right; color: var(--ink-soft); }
+    .t-max { font-weight: 600; }
+    .range-track { position: relative; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.2); }
+    .range-fill { position: absolute; top: 0; bottom: 0; border-radius: 99px; background: linear-gradient(90deg, #9ad4ff, var(--accent)); }
+    .note { margin-top: 8px; color: var(--ink-soft); font-size: 0.9rem; }
+
+    /* ============ Status: welcome, loading, error, setup ============ */
+    .panel { padding: 24px; }
+    .panel h2 { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+    .panel p { color: var(--ink-soft); max-width: 60ch; }
+    .panel .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .panel .actions { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .panel-error { background: var(--danger-bg); border-color: rgba(255, 170, 170, 0.5); }
+    .panel-error p { color: #fff; }
+
+    .setup-form { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .setup-form input {
+      flex: 1 1 240px; min-width: 0; min-height: 48px; padding: 0 16px; border-radius: 14px;
+      border: 1px solid var(--glass-line); background: rgba(255, 255, 255, 0.14);
+    }
+    .setup-form .btn { min-height: 48px; }
+    .panel a { color: var(--accent); }
+
+    .sk {
+      border-radius: 14px;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+      background-size: 200% 100%; animation: shimmer 1.4s linear infinite;
+    }
+    .sk-now { padding: 24px; display: grid; gap: 14px; }
+    .sk-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    .foot { margin-top: 24px; text-align: center; font-size: 0.85rem; color: var(--ink-soft); }
+    .foot span { display: inline-block; padding: 6px 14px; border-radius: 99px; background: var(--glass); }
+
+    @media (max-width: 420px) {
+      .day { grid-template-columns: minmax(70px, 1fr) 40px 34px minmax(40px, 1fr) 34px; gap: 6px; }
+      .day img { width: 38px; height: 38px; }
+      .now { padding: 20px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      :root { transition: none; }
+      .sk { animation: none; }
+      .btn, .unit button { transition: none; }
+    }
+  </style>
+</head>
+<body data-theme="default">
+  <div class="app">
+    <header class="top">
+      <h1 class="brand">Stasiun Cuaca</h1>
+      <div class="unit" role="group" aria-label="Satuan suhu">
+        <button type="button" data-unit="C" aria-pressed="true">°C</button>
+        <button type="button" data-unit="F" aria-pressed="false">°F</button>
+      </div>
+    </header>
+
+    <form id="search-form" class="search" role="search" novalidate>
+      <label class="sr-only" for="city-input">Nama kota</label>
+      <input id="city-input" type="search" placeholder="Cari kota, mis. Medan" autocomplete="off" maxlength="80">
+      <button type="submit" id="search-btn" class="btn btn-primary">Cari</button>
+      <button type="button" id="geo-btn" class="btn btn-geo" aria-label="Gunakan lokasi saya" title="Gunakan lokasi saya">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="8"/>
+          <path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>
+        </svg>
+      </button>
+    </form>
+
+    <div id="history" class="history" hidden>
+      <span class="history-label">Pencarian terakhir:</span>
+      <span id="history-list" class="history" style="margin:0"></span>
+      <button type="button" id="clear-history" class="chip chip-clear">Hapus riwayat</button>
+    </div>
+
+    <main>
+      <!-- Awal -->
+      <section id="view-welcome" class="view glass panel" hidden>
+        <h2>Cek cuaca kota mana pun</h2>
+        <p>Ketik nama kota, atau tekan tombol lokasi untuk melihat cuaca saat ini dan prakiraan 5 hari.</p>
+        <div class="chips" id="suggestions"></div>
+      </section>
+
+      <!-- Setup API key -->
+      <section id="view-setup" class="view glass panel" hidden>
+        <h2>Masukkan API key OpenWeatherMap</h2>
+        <p>Buat akun gratis di <a href="https://home.openweathermap.org/users/sign_up" target="_blank" rel="noopener">openweathermap.org</a>, lalu salin API key dari menu API keys. Key baru kadang butuh beberapa menit sampai 2 jam untuk aktif.</p>
+        <form id="setup-form" class="setup-form" novalidate>
+          <label class="sr-only" for="key-input">API key</label>
+          <input id="key-input" type="text" placeholder="Tempel API key di sini" autocomplete="off" spellcheck="false">
+          <button type="submit" class="btn btn-primary">Simpan key</button>
+        </form>
+        <p id="setup-msg" class="note" role="alert"></p>
+      </section>
+
+      <!-- Loading -->
+      <section id="view-loading" class="view" hidden aria-busy="true" aria-label="Memuat data cuaca">
+        <div class="result-grid">
+          <div class="glass sk-now">
+            <div class="sk" style="height:34px;width:60%"></div>
+            <div class="sk" style="height:18px;width:40%"></div>
+            <div class="sk" style="height:110px;width:70%"></div>
+            <div class="sk" style="height:22px;width:50%"></div>
+          </div>
+          <div class="sk-tiles">
+            <div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div>
+            <div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div>
+            <div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div>
+          </div>
+        </div>
+        <div class="sk" style="height:300px;margin-top:16px"></div>
+        <p class="sr-only" role="status">Memuat data cuaca…</p>
+      </section>
+
+      <!-- Error -->
+      <section id="view-error" class="view glass panel panel-error" role="alert" hidden>
+        <h2 id="error-title"></h2>
+        <p id="error-message"></p>
+        <div class="actions" id="error-actions"></div>
+      </section>
+
+      <!-- Hasil -->
+      <section id="view-result" class="view" hidden aria-live="polite">
+        <div class="result-grid">
+          <article class="glass now" id="now"></article>
+          <div class="tiles" id="tiles"></div>
+        </div>
+        <section class="glass forecast" id="forecast" aria-labelledby="forecast-title"></section>
+      </section>
+    </main>
+
+    <footer class="foot"><span>Data cuaca dari OpenWeatherMap</span></footer>
+  </div>
+
+  <script>
+    'use strict';
+
+    /* ==========================================================
+       KONFIGURASI
+       Isi API_KEY di bawah dengan key dari openweathermap.org.
+       Jika dibiarkan, aplikasi akan meminta key lewat form di layar
+       dan menyimpannya di browser (LocalStorage).
+       ========================================================== */
+    const CONFIG = {
+      API_KEY: 'ISI_API_KEY_ANDA',
+      BASE_URL: 'https://api.openweathermap.org/data/2.5',
+      ICON_URL: 'https://openweathermap.org/img/wn',
+      MAX_HISTORY: 6,
+      SUGGESTIONS: ['Medan', 'Jakarta', 'Tokyo', 'London']
+    };
+    const KEYS = {
+      apiKey: 'stasiun-cuaca:api-key',
+      history: 'stasiun-cuaca:history',
+      unit: 'stasiun-cuaca:unit',
+      last: 'stasiun-cuaca:last-city'
+    };
+
+    /* ---------- Util ---------- */
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+    ));
+
+    const store = {
+      get(key, fallback = null) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw === null ? fallback : JSON.parse(raw);
+        } catch { return fallback; }
+      },
+      set(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage penuh / diblokir */ }
+      },
+      remove(key) {
+        try { localStorage.removeItem(key); } catch { /* diabaikan */ }
+      }
+    };
+
+    /* ---------- State ---------- */
+    const state = {
+      unit: 'C',
+      current: null,
+      forecast: null,
+      pendingQuery: null,
+      requestSeq: 0
+    };
+
+    /* ---------- Konversi satuan ---------- */
+    const toUnit = (celsius) => (state.unit === 'C' ? celsius : (celsius * 9) / 5 + 32);
+    const fmtTemp = (celsius) => `${Math.round(toUnit(celsius))}°`;
+    const fmtWind = (ms) => (state.unit === 'C'
+      ? `${Math.round(ms * 3.6)} km/jam`
+      : `${Math.round(ms * 2.23694)} mph`);
+
+    /* ---------- Waktu lokal kota (pakai offset timezone dari API) ---------- */
+    const shifted = (unixSeconds, tzOffset) => new Date((unixSeconds + tzOffset) * 1000);
+    const dateFmt = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+    const weekdayFmt = new Intl.DateTimeFormat('id-ID', { weekday: 'long', timeZone: 'UTC' });
+    const timeFmt = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' });
+    const isoDay = (unixSeconds, tzOffset) => shifted(unixSeconds, tzOffset).toISOString().slice(0, 10);
+    const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+
+    /* ---------- API ---------- */
+    class ApiError extends Error {
+      constructor(type, status = 0) {
+        super(type);
+        this.type = type;
+        this.status = status;
+      }
+    }
+
+    const getApiKey = () => {
+      if (CONFIG.API_KEY && CONFIG.API_KEY !== 'ISI_API_KEY_ANDA') return CONFIG.API_KEY;
+      return (store.get(KEYS.apiKey, '') || '').trim();
+    };
+
+    const buildUrl = (endpoint, params, apiKey) => {
+      const url = new URL(`${CONFIG.BASE_URL}/${endpoint}`);
+      Object.entries({ ...params, appid: apiKey, units: 'metric', lang: 'id' })
+        .forEach(([key, value]) => url.searchParams.set(key, value));
+      return url.toString();
+    };
+
+    const fetchJson = async (url) => {
+      let response;
+      try {
+        response = await fetch(url);
+      } catch {
+        throw new ApiError('network');
+      }
+      if (!response.ok) {
+        const type = { 404: 'not_found', 401: 'bad_key', 429: 'rate_limit' }[response.status] ?? 'server';
+        throw new ApiError(type, response.status);
+      }
+      return response.json();
+    };
+
+    const fetchWeather = async (query) => {
+      const apiKey = getApiKey();
+      const [current, forecast] = await Promise.allSettled([
+        fetchJson(buildUrl('weather', query, apiKey)),
+        fetchJson(buildUrl('forecast', query, apiKey))
+      ]);
+      if (current.status === 'rejected') throw current.reason;
+      return {
+        current: current.value,
+        forecast: forecast.status === 'fulfilled' ? forecast.value : null
+      };
+    };
+
+    /* ---------- Pengolahan data (array method: map, filter, reduce) ---------- */
+    const buildDailyForecast = (forecast) => {
+      const tz = forecast.city.timezone;
+
+      // reduce: kelompokkan data 3-jam menjadi per hari (waktu lokal kota)
+      const groups = forecast.list.reduce((acc, item) => {
+        const key = isoDay(item.dt, tz);
+        const hour = shifted(item.dt, tz).getUTCHours();
+        (acc[key] ??= { key, items: [] }).items.push({ ...item, hour });
+        return acc;
+      }, {});
+
+      // map: ringkas tiap hari (min, maks, ikon siang hari, peluang hujan)
+      return Object.values(groups).slice(0, 5).map(({ key, items }) => {
+        const midday = items.reduce((best, item) => (
+          Math.abs(item.hour - 12) < Math.abs(best.hour - 12) ? item : best
+        ));
+        return {
+          key,
+          dt: midday.dt,
+          min: Math.min(...items.map((item) => item.main.temp_min)),
+          max: Math.max(...items.map((item) => item.main.temp_max)),
+          icon: midday.weather[0].icon.replace('n', 'd'),
+          desc: midday.weather[0].description,
+          rain: Math.max(...items.map((item) => item.pop ?? 0))
+        };
+      });
+    };
+
+    const pickTheme = ({ id, icon }) => {
+      if (id >= 200 && id < 300) return 'thunder';
+      if (id >= 300 && id < 600) return 'rain';
+      if (id >= 600 && id < 700) return 'snow';
+      if (id >= 700 && id < 800) return 'mist';
+      if (id === 800) return icon.endsWith('n') ? 'clear-night' : 'clear-day';
+      return 'clouds';
+    };
+
+    /* ---------- Tampilan ---------- */
+    const views = ['welcome', 'setup', 'loading', 'error', 'result'];
+    const showView = (name) => {
+      views.forEach((view) => { $(`#view-${view}`).hidden = view !== name; });
+    };
+
+    const setBusy = (busy) => {
+      $('#search-btn').disabled = busy;
+      $('#geo-btn').disabled = busy;
+      $('#search-btn').textContent = busy ? 'Mencari…' : 'Cari';
+    };
+
+    const renderNow = (current) => {
+      const weather = current.weather[0];
+      const tz = current.timezone;
+      const nowLocal = Date.now() / 1000;
+      $('#now').innerHTML = `
+        <div class="now-head">
+          <div>
+            <h2 class="city">${esc(current.name)}<span class="country">${esc(current.sys?.country ?? '')}</span></h2>
+            <p class="local-time">${capitalize(dateFmt.format(shifted(nowLocal, tz)))}, ${timeFmt.format(shifted(nowLocal, tz))} waktu setempat</p>
+          </div>
+          <img class="now-icon" src="${CONFIG.ICON_URL}/${esc(weather.icon)}@2x.png" alt="${esc(weather.description)}" width="96" height="96">
+        </div>
+        <p class="temp" aria-label="Suhu ${Math.round(toUnit(current.main.temp))} derajat">${fmtTemp(current.main.temp)}</p>
+        <p class="desc">${esc(capitalize(weather.description))}</p>
+        <div class="now-meta">
+          <span>Terasa ${fmtTemp(current.main.feels_like)}</span>
+          <span>Maks ${fmtTemp(current.main.temp_max)}</span>
+          <span>Min ${fmtTemp(current.main.temp_min)}</span>
+        </div>`;
+    };
+
+    const renderTiles = (current) => {
+      const { main, wind, visibility, sys, timezone: tz } = current;
+      const tiles = [
+        { label: 'Kelembapan', value: `${main.humidity}%`, meter: main.humidity },
+        { label: 'Angin', value: wind ? fmtWind(wind.speed) : null },
+        { label: 'Tekanan udara', value: `${main.pressure} hPa` },
+        { label: 'Jarak pandang', value: Number.isFinite(visibility) ? `${(visibility / 1000).toFixed(1)} km` : null },
+        { label: 'Matahari terbit', value: sys?.sunrise ? timeFmt.format(shifted(sys.sunrise, tz)) : null },
+        { label: 'Matahari terbenam', value: sys?.sunset ? timeFmt.format(shifted(sys.sunset, tz)) : null }
+      ];
+      $('#tiles').innerHTML = tiles
+        .filter((tile) => tile.value !== null)
+        .map((tile) => `
+          <div class="glass tile">
+            <p class="tile-label">${tile.label}</p>
+            <p class="tile-value">${tile.value}</p>
+            ${tile.meter !== undefined
+              ? `<div class="meter" role="img" aria-label="Kelembapan ${tile.meter} persen"><span style="width:${tile.meter}%"></span></div>`
+              : ''}
+          </div>`)
+        .join('');
+    };
+
+    const renderForecast = (forecast) => {
+      const box = $('#forecast');
+      if (!forecast) {
+        box.innerHTML = `<h2 id="forecast-title">Prakiraan 5 hari</h2>
+          <p class="note">Prakiraan belum bisa dimuat. Cuaca saat ini tetap akurat, coba cari ulang untuk memuat prakiraan.</p>`;
+        return;
+      }
+      const tz = forecast.city.timezone;
+      const days = buildDailyForecast(forecast);
+      const todayKey = isoDay(Date.now() / 1000, tz);
+      const lowest = Math.min(...days.map((day) => day.min));
+      const highest = Math.max(...days.map((day) => day.max));
+      const span = Math.max(highest - lowest, 1);
+
+      box.innerHTML = `
+        <h2 id="forecast-title">Prakiraan 5 hari</h2>
+        <ul class="days">
+          ${days.map((day) => {
+            const left = ((day.min - lowest) / span) * 100;
+            const width = Math.max(((day.max - day.min) / span) * 100, 8);
+            const label = day.key === todayKey ? 'Hari ini' : weekdayFmt.format(shifted(day.dt, tz));
+            return `
+            <li class="day">
+              <span class="day-name">${esc(label)}${day.rain >= 0.2 ? `<span class="day-rain">Hujan ${Math.round(day.rain * 100)}%</span>` : ''}</span>
+              <img src="${CONFIG.ICON_URL}/${esc(day.icon)}.png" alt="${esc(day.desc)}" width="44" height="44" loading="lazy">
+              <span class="t-min" aria-label="Minimum">${fmtTemp(day.min)}</span>
+              <span class="range-track" aria-hidden="true"><span class="range-fill" style="left:${left}%;width:${Math.min(width, 100 - left)}%"></span></span>
+              <span class="t-max" aria-label="Maksimum">${fmtTemp(day.max)}</span>
+            </li>`;
+          }).join('')}
+        </ul>`;
+    };
+
+    const renderResult = () => {
+      const { current, forecast } = state;
+      if (!current) return;
+      renderNow(current);
+      renderTiles(current);
+      renderForecast(forecast);
+      const theme = pickTheme(current.weather[0]);
+      document.body.dataset.theme = theme;
+      document.title = `${Math.round(toUnit(current.main.temp))}° ${current.name} · Stasiun Cuaca`;
+      showView('result');
+    };
+
+    const showError = ({ title, message, keyAction = false }) => {
+      $('#error-title').textContent = title;
+      $('#error-message').textContent = message;
+      const actions = $('#error-actions');
+      actions.innerHTML = keyAction
+        ? '<button type="button" class="btn btn-primary" id="change-key">Ubah API key</button>'
+        : '';
+      document.body.dataset.theme = 'default';
+      showView('error');
+    };
+
+    const describeError = (error, label) => {
+      switch (error.type) {
+        case 'not_found':
+          return { title: 'Kota tidak ditemukan', message: `Tidak ada hasil untuk "${label}". Periksa ejaan, atau coba nama kota lain (contoh: Medan, Bandung).` };
+        case 'network':
+          return { title: 'Tidak bisa terhubung', message: 'Koneksi internet bermasalah atau server tidak dapat dijangkau. Periksa jaringan Anda lalu coba lagi.' };
+        case 'bad_key':
+          return { title: 'API key ditolak', message: 'API key tidak valid atau belum aktif. Key baru bisa butuh beberapa menit hingga 2 jam untuk aktif.', keyAction: true };
+        case 'rate_limit':
+          return { title: 'Terlalu banyak permintaan', message: 'Batas permintaan API tercapai. Tunggu sebentar, lalu coba lagi.' };
+        default:
+          return { title: 'Terjadi kesalahan', message: 'Server cuaca sedang bermasalah. Coba lagi beberapa saat lagi.' };
+      }
+    };
+
+    /* ---------- Riwayat pencarian (LocalStorage) ---------- */
+    const getHistory = () => {
+      const saved = store.get(KEYS.history, []);
+      return Array.isArray(saved) ? saved.filter((item) => typeof item === 'string') : [];
+    };
+
+    const saveToHistory = (city) => {
+      const next = [city, ...getHistory().filter((item) => item.toLowerCase() !== city.toLowerCase())]
+        .slice(0, CONFIG.MAX_HISTORY);
+      store.set(KEYS.history, next);
+      renderHistory();
+    };
+
+    const renderHistory = () => {
+      const history = getHistory();
+      $('#history').hidden = history.length === 0;
+      $('#history-list').innerHTML = history
+        .map((city) => `<button type="button" class="chip" data-city="${esc(city)}">${esc(city)}</button>`)
+        .join('');
+    };
+
+    /* ---------- Alur utama ---------- */
+    const loadWeather = async (query, label) => {
+      if (!getApiKey()) {
+        state.pendingQuery = { query, label };
+        showView('setup');
+        return;
+      }
+      const seq = ++state.requestSeq;
+      setBusy(true);
+      showView('loading');
+      try {
+        const data = await fetchWeather(query);
+        if (seq !== state.requestSeq) return; // abaikan respons lama
+        state.current = data.current;
+        state.forecast = data.forecast;
+        renderResult();
+        if (query.q) {
+          saveToHistory(data.current.name);
+          store.set(KEYS.last, data.current.name);
+        }
+      } catch (error) {
+        if (seq !== state.requestSeq) return;
+        showError(describeError(error instanceof ApiError ? error : new ApiError('server'), label));
+      } finally {
+        if (seq === state.requestSeq) setBusy(false);
+      }
+    };
+
+    const searchCity = (rawName) => {
+      const city = rawName.trim().replace(/\s+/g, ' ');
+      if (!city) {
+        showError({ title: 'Nama kota kosong', message: 'Ketik nama kota terlebih dahulu, lalu tekan Cari.' });
+        $('#city-input').focus();
+        return;
+      }
+      $('#city-input').value = city;
+      loadWeather({ q: city }, city);
+    };
+
+    const useMyLocation = () => {
+      if (!('geolocation' in navigator)) {
+        showError({ title: 'Lokasi tidak didukung', message: 'Browser ini tidak mendukung geolokasi. Cari kota secara manual.' });
+        return;
+      }
+      setBusy(true);
+      showView('loading');
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => loadWeather({ lat: coords.latitude, lon: coords.longitude }, 'lokasi Anda'),
+        (error) => {
+          setBusy(false);
+          const denied = error.code === error.PERMISSION_DENIED;
+          showError({
+            title: denied ? 'Izin lokasi ditolak' : 'Lokasi tidak tersedia',
+            message: denied
+              ? 'Izinkan akses lokasi di pengaturan browser, atau cari kota secara manual.'
+              : 'Posisi Anda tidak dapat ditentukan. Cari kota secara manual.'
+          });
+        },
+        { timeout: 10000, maximumAge: 300000 }
+      );
+    };
+
+    const setUnit = (unit) => {
+      state.unit = unit;
+      store.set(KEYS.unit, unit);
+      $$('.unit button').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.unit === unit));
+      });
+      renderResult();
+    };
+
+    /* ---------- Event ---------- */
+    $('#search-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      searchCity($('#city-input').value);
+    });
+
+    $('#geo-btn').addEventListener('click', useMyLocation);
+
+    $('.unit').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-unit]');
+      if (button) setUnit(button.dataset.unit);
+    });
+
+    $('#history').addEventListener('click', (event) => {
+      if (event.target.id === 'clear-history') {
+        store.remove(KEYS.history);
+        renderHistory();
+        return;
+      }
+      const chip = event.target.closest('[data-city]');
+      if (chip) searchCity(chip.dataset.city);
+    });
+
+    $('#suggestions').addEventListener('click', (event) => {
+      const chip = event.target.closest('[data-city]');
+      if (chip) searchCity(chip.dataset.city);
+    });
+
+    $('#error-actions').addEventListener('click', (event) => {
+      if (event.target.id === 'change-key') {
+        $('#setup-msg').textContent = '';
+        showView('setup');
+        $('#key-input').focus();
+      }
+    });
+
+    $('#setup-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const key = $('#key-input').value.trim();
+      if (!/^[a-z0-9]{20,}$/i.test(key)) {
+        $('#setup-msg').textContent = 'API key tidak valid. Biasanya terdiri dari 32 huruf dan angka tanpa spasi.';
+        return;
+      }
+      store.set(KEYS.apiKey, key);
+      $('#key-input').value = '';
+      $('#setup-msg').textContent = '';
+      const pending = state.pendingQuery;
+      state.pendingQuery = null;
+      if (pending) loadWeather(pending.query, pending.label);
+      else showView('welcome');
+    });
+
+    /* ---------- Inisialisasi ---------- */
+    const init = () => {
+      const savedUnit = store.get(KEYS.unit, 'C');
+      state.unit = savedUnit === 'F' ? 'F' : 'C';
+      $$('.unit button').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.unit === state.unit));
+      });
+
+      $('#suggestions').innerHTML = CONFIG.SUGGESTIONS
+        .map((city) => `<button type="button" class="chip" data-city="${esc(city)}">${esc(city)}</button>`)
+        .join('');
+      renderHistory();
+
+      const last = store.get(KEYS.last, '');
+      if (typeof last === 'string' && last) {
+        $('#city-input').value = last;
+        loadWeather({ q: last }, last);
+      } else if (!getApiKey()) {
+        showView('setup');
+      } else {
+        showView('welcome');
+      }
+    };
+
+    init();
+  </script>
+</body>
+</html>
